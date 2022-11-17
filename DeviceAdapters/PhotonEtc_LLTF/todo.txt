@@ -1,0 +1,3 @@
+* remove proprietary files:
+  * PE_Filter.h
+* make the module search for and find the filter configuration file, rather than using the hard-coded version
