@@ -19,10 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PELLTF.h" />
+    <ClInclude Include="PhotonEtcLLTF.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PELLTF.cpp" />
+    <ClCompile Include="PhotonEtcLLTF.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\MMDevice\MMDevice-SharedRuntime.vcxproj">
