@@ -7,7 +7,7 @@ namespace fs = std::experimental::filesystem;
 
 MODULE_API void InitializeModuleData()
 {
-	RegisterDevice(PhotonEtcLLTF_NAME, MM::GenericDevice, PhotonEtcLLTF_DESCRIPTION);
+	RegisterDevice(g_PhotonEtcLLTFName, MM::GenericDevice, g_PhotonEtcLLTFDescription);
 }
 
 MODULE_API void DeleteDevice(MM::Device* pDevice)
@@ -20,7 +20,7 @@ MODULE_API MM::Device* CreateDevice(const char* deviceName)
 	if (deviceName == 0) {
 		return 0;
 	}
-	else if (strcmp(deviceName, PhotonEtcLLTF_NAME) == 0) {
+	else if (strcmp(deviceName, g_PhotonEtcLLTFName) == 0) {
 		PhotonEtcLLTF* lltf = new PhotonEtcLLTF();
 		return lltf;
 	}
@@ -33,6 +33,7 @@ PhotonEtcLLTF::PhotonEtcLLTF() {
 	fs::path defaultFilename;
 	CPropertyAction* pActConf = new CPropertyAction(this, &PhotonEtcLLTF::onConfFile);
 
+	// TODO load this search path from an environment variable
 	std::vector<std::string>confFileSearchPaths = {
 		".",
 		"C:\\Program Files\\Photon etc\\PHySpecV2\\Devices",
@@ -79,25 +80,30 @@ int PhotonEtcLLTF::Initialize() {
 	this->GetProperty("LLTF XML File", confFilename);
 	std::snprintf(message, 1024, "confFilename=%s", confFilename);
 	LogMessage(message);
-	if (confFilename[0] == '\0') { return DEVICE_ERR; }
+	if (confFilename[0] == '\0') {
+		std::snprintf(message, 1024, "Could not load XML file (%s)", confFilename);
+		// TODO this error message should show up on a popup (as should other errors)
+		SetErrorText(DEVICE_ERR,  message);
+		return DEVICE_ERR;
+	}
 
 	status = PE_Create(confFilename, &this->handle);
 	std::snprintf(message, 1024, "handle=%p, status=%d (%s)", this->handle, status, status_messages[status].c_str());
 	LogMessage(message);
-	if (status != PE_SUCCESS) { return DEVICE_ERR; }
+	if (status != PE_SUCCESS) { return status; }
 
-	status = PE_GetSystemName(this->handle, 0, this->systemName, PhotonEtcLLTF_MAX_NAME_SIZE);
+	status = PE_GetSystemName(this->handle, 0, this->systemName, g_PhotonEtcLLTFMaxNameSize);
 	std::snprintf(message, 1024, "systemName=%s, status=%d (%s)", this->systemName, status, status_messages[status].c_str());
 	LogMessage(message);
 	CreateProperty("System Name", this->systemName, MM::String, true);
-	if (status != PE_SUCCESS) { return DEVICE_ERR; }
+	if (status != PE_SUCCESS) { return status; }
 
 	status = PE_Open(this->handle, this->systemName);	
 	std::snprintf(message, 1024, "handle=%p, name=%s, status=%d (%s)", 
 		this->handle, this->systemName, status, status_messages[status].c_str()
 	);
 	LogMessage(message);
-	if (status != PE_SUCCESS) { return DEVICE_ERR; }
+	if (status != PE_SUCCESS) { return status; }
 
 	CPropertyAction* pAct = new CPropertyAction(this, &PhotonEtcLLTF::onWavelength);
 	PE_GetWavelength(this->handle, &wavelength);
@@ -115,8 +121,8 @@ int PhotonEtcLLTF::Shutdown() {
 }
 
 void PhotonEtcLLTF::GetName(char* name) const {
-	assert(strlen(PhotonEtcLLTF_NAME) < CDeviceUtils::GetMaxStringLength());
-	CDeviceUtils::CopyLimitedString(name, PhotonEtcLLTF_NAME);
+	assert(strlen(g_PhotonEtcLLTFName) < CDeviceUtils::GetMaxStringLength());
+	CDeviceUtils::CopyLimitedString(name, g_PhotonEtcLLTFName);
 }
 
 bool PhotonEtcLLTF::Busy() {
@@ -126,6 +132,8 @@ bool PhotonEtcLLTF::Busy() {
 }
 
 int PhotonEtcLLTF::onConfFile(MM::PropertyBase* pProp, MM::ActionType eAct) {
+	UNREFERENCED_PARAMETER(pProp);
+	UNREFERENCED_PARAMETER(eAct);
 	return DEVICE_OK;
 }
 

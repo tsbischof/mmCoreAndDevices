@@ -6,9 +6,9 @@
 #include "PE_Filter.h"
 #include <string>
 
-size_t const PhotonEtcLLTF_MAX_NAME_SIZE = 256;
-const char* const PhotonEtcLLTF_NAME = "PhotonEtc LLTF";
-const char* const PhotonEtcLLTF_DESCRIPTION = "Photon etc Laser Line Tunable Filter";
+size_t const g_PhotonEtcLLTFMaxNameSize = 256;
+const char* const g_PhotonEtcLLTFName = "PhotonEtc LLTF";
+const char* const g_PhotonEtcLLTFDescription = "Photon etc Laser Line Tunable Filter";
 
 std::vector<std::string> status_messages = {
 	"PE_SUCCESS",
@@ -43,6 +43,6 @@ public:
 private:
 	// TODO: change this to instead look for device files in the 3rdparty or other folder
 	PE_HANDLE handle = NULL;
-	char systemName[PhotonEtcLLTF_MAX_NAME_SIZE];
+	char systemName[g_PhotonEtcLLTFMaxNameSize];
 };
 
