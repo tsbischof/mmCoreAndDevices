@@ -1,7 +1,9 @@
 #include "PhotonEtcLLTF.h"
 
-#include <boost/filesystem.hpp>
-
+// TODO replace with boost::filesystem, or with std::filesystem (if the project shifts to C++17)
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 
 MODULE_API void InitializeModuleData()
 {
@@ -28,26 +30,40 @@ MODULE_API MM::Device* CreateDevice(const char* deviceName)
 }
 
 PhotonEtcLLTF::PhotonEtcLLTF() {
-	std::vector<std::string>confFilePaths = {
+	fs::path defaultFilename;
+	CPropertyAction* pActConf = new CPropertyAction(this, &PhotonEtcLLTF::onConfFile);
+
+	std::vector<std::string>confFileSearchPaths = {
 		".",
 		"C:\\Program Files\\Photon etc\\PHySpecV2\\Devices",
 		"C:\\Program Files (x86)\\Photon etc\\PHySpecV2\\Devices"
 	};
 
-	CPropertyAction* pAct = new CPropertyAction(this, &PhotonEtcLLTF::onConfFile);
-	CreateProperty("Device XML File", "C:\\Program Files\\Photon etc\\PHySpecV2\\Devices\\M000010653.xml", MM::String, false, pAct, true);
+	std::vector<fs::path>confFilePaths;
 
-	LogMessage("finding XML files");
-	// TODO this loop causes a runtime error. Perhaps the version of boost linked here is not correct?
-	//for (const auto& confFilePath : confFilePaths) {
-	//	LogMessage(confFilePath);
-	//	for (const auto& entry : boost::filesystem::directory_iterator(confFilePath)) {
-	//		LogMessage(entry.path().filename().string().c_str());
-	//		if (entry.path().filename().string().find("M00001") && entry.path().filename().string().rfind("xml")) {
-	//			AddAllowedValue("Device XML File", entry.path().filename().string().c_str());
-	//		}
-	//	}
-	//}
+	for (const auto& confFilePath : confFileSearchPaths) {
+		for (const auto& entry : fs::directory_iterator(confFilePath)) {
+			std::string filename = entry.path().filename().string();
+			if (fs::is_regular_file(entry) &&
+				filename.find("M00001", 0) != std::string::npos &&
+				filename.rfind("xml", filename.length() - 3) != std::string::npos) {
+				confFilePaths.push_back(entry.path());
+			}
+		}
+	}
+
+	if (confFilePaths.size() > 0) {
+		CreateProperty("LLTF XML File", confFilePaths[0].string().c_str(), MM::String, false, pActConf, true);
+	}
+	else {
+		// TODO add popup explaining that there is not a valid configuration file
+		CreateProperty("LLTF XML File", "None", MM::String, false, pActConf, true);
+	}
+	
+	// TODO should skip the first element since we already added it
+	for (const auto& confFilePath : confFilePaths) {
+		AddAllowedValue("LLTF XML File", confFilePath.string().c_str());
+	}
 }
 
 PhotonEtcLLTF::~PhotonEtcLLTF() {}
@@ -60,26 +76,28 @@ int PhotonEtcLLTF::Initialize() {
 	char message[1024];
 	char confFilename[1024];
 
-	this->GetProperty("Device XML File", confFilename);
+	this->GetProperty("LLTF XML File", confFilename);
 	std::snprintf(message, 1024, "confFilename=%s", confFilename);
 	LogMessage(message);
+	if (confFilename[0] == '\0') { return DEVICE_ERR; }
 
 	status = PE_Create(confFilename, &this->handle);
-	std::snprintf(message, 1024, "handle=%p", this->handle);
+	std::snprintf(message, 1024, "handle=%p, status=%d (%s)", this->handle, status, status_messages[status].c_str());
 	LogMessage(message);
+	if (status != PE_SUCCESS) { return DEVICE_ERR; }
 
 	status = PE_GetSystemName(this->handle, 0, this->systemName, PhotonEtcLLTF_MAX_NAME_SIZE);
-	LogMessage(this->systemName);
+	std::snprintf(message, 1024, "systemName=%s, status=%d (%s)", this->systemName, status, status_messages[status].c_str());
+	LogMessage(message);
 	CreateProperty("System Name", this->systemName, MM::String, true);
+	if (status != PE_SUCCESS) { return DEVICE_ERR; }
 
 	status = PE_Open(this->handle, this->systemName);	
 	std::snprintf(message, 1024, "handle=%p, name=%s, status=%d (%s)", 
 		this->handle, this->systemName, status, status_messages[status].c_str()
 	);
 	LogMessage(message);
-	if (status != PE_SUCCESS) {
-		return DEVICE_ERR;
-	} 
+	if (status != PE_SUCCESS) { return DEVICE_ERR; }
 
 	CPropertyAction* pAct = new CPropertyAction(this, &PhotonEtcLLTF::onWavelength);
 	PE_GetWavelength(this->handle, &wavelength);
